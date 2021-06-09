@@ -3,9 +3,9 @@
 [![Version](https://img.shields.io/crates/v/tmp_env.svg)](https://crates.io/crates/tmp_env)
 [![Documentation](https://docs.rs/tmp_env/badge.svg)](https://docs.rs/tmp_env)
 
-tmp_env is a crate which lets you create temporary environement and be automatically cleaned when not needed.
+tmp_env is a crate which lets you create temporary environment and be automatically cleaned when not needed.
 
-For example sometimes you need to change the current directory or set environment variables to launch a process but you don't need this temporary environement for the rest of your program.
+For example sometimes you need to change the current directory or set environment variables to launch a process but you don't need this temporary environment for the rest of your program.
 Then you will use `tmp_env` to create environment variable using `tmp_env::set_var` instead of `std::env::set_var` to get from `tmp_env::set_var` a datastructure which will automatically unset the
 corresponding environment variable when dropped.
 
