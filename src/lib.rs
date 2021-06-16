@@ -1,7 +1,7 @@
-//! tmp_env is a crate which lets you create temporary environment and be automatically cleaned when not needed.
+//! tmp_env is a crate which lets you create temporary environment and be automatically restored/cleaned when not needed.
 
 //! For example sometimes you need to change the current directory or set environment variables to launch a process but you don't need this temporary environment for the rest of your program.
-//! Then you will use `tmp_env` to create environment variable using `tmp_env::set_var` instead of `std::env::set_var` to get from `tmp_env::set_var` a datastructure which will automatically unset the
+//! Then you will use `tmp_env` to create environment variable using `tmp_env::set_var` instead of `std::env::set_var` to get from `tmp_env::set_var` a datastructure which will automatically restore the
 //! corresponding environmet variable when dropped.
 use std::{
     ffi::{OsStr, OsString},
@@ -48,9 +48,9 @@ impl Drop for CurrentDir {
         std::env::set_current_dir(&self.0).expect("cannot go back to the previous directory");
     }
 }
-/// A helper datastructure for ensuring that we unset the current environment variable before the
+/// A helper datastructure for ensuring that we restore the current environment variable before the
 /// end of the current scope.
-pub struct CurrentEnv(OsString);
+pub struct CurrentEnv(OsString, Option<String>);
 
 impl Debug for CurrentEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -59,26 +59,30 @@ impl Debug for CurrentEnv {
 }
 
 /// Sets the environment variable k to the value v for the currently running process.
-/// It returns a datastructure to keep the environment variable set. When dropped the environment variable is removed
+/// It returns a datastructure to keep the environment variable set. When dropped the environment variable is restored
 /// ```
 /// {
 ///     let _tmp_env = tmp_env::set_var("TEST_TMP_ENV", "myvalue");
 ///     assert_eq!(std::env::var("TEST_TMP_ENV"), Ok(String::from("myvalue")));
 /// }
 /// assert!(std::env::var("TEST_TMP_ENV").is_err());
-/// // Because guard is dropped then the environment variable is also automatically unset
+/// // Because guard is dropped then the environment variable is also automatically unset (not restored because no previous value was set)
 /// tmp_env::set_var("TEST_TMP_ENV_DROPPED", "myvaluedropped");
 /// assert!(std::env::var("TEST_TMP_ENV_DROPPED").is_err());
 /// ```
 pub fn set_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(key: K, value: V) -> CurrentEnv {
     let key = key.as_ref();
+    let previous_val = std::env::var(key).ok();
     std::env::set_var(key, value);
-    CurrentEnv(key.to_owned())
+    CurrentEnv(key.to_owned(), previous_val)
 }
 
 impl Drop for CurrentEnv {
     fn drop(&mut self) {
-        std::env::remove_var(&self.0)
+        match self.1.take() {
+            Some(previous_val) => std::env::set_var(&self.0, previous_val),
+            None => std::env::remove_var(&self.0),
+        }
     }
 }
 
@@ -152,6 +156,22 @@ mod tests {
         // Because guard is dropped
         set_var("TEST_TMP_ENV_DROPPED", "myvaluedropped");
         assert!(std::env::var("TEST_TMP_ENV_DROPPED").is_err());
+    }
+
+    #[test]
+    fn test_env_with_previous_value() {
+        std::env::set_var("TEST_TMP_ENV_PREVIOUS", "previous_value");
+        {
+            let _tmp_env = set_var("TEST_TMP_ENV_PREVIOUS", "myvalue");
+            assert_eq!(
+                std::env::var("TEST_TMP_ENV_PREVIOUS"),
+                Ok(String::from("myvalue"))
+            );
+        }
+        assert_eq!(
+            std::env::var("TEST_TMP_ENV_PREVIOUS"),
+            Ok(String::from("previous_value"))
+        );
     }
 
     #[test]

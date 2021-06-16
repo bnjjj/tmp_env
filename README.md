@@ -6,7 +6,7 @@
 tmp_env is a crate which lets you create temporary environment and be automatically cleaned when not needed.
 
 For example sometimes you need to change the current directory or set environment variables to launch a process but you don't need this temporary environment for the rest of your program.
-Then you will use `tmp_env` to create environment variable using `tmp_env::set_var` instead of `std::env::set_var` to get from `tmp_env::set_var` a datastructure which will automatically unset the
+Then you will use `tmp_env` to create environment variable using `tmp_env::set_var` instead of `std::env::set_var` to get from `tmp_env::set_var` a datastructure which will automatically restore the
 corresponding environment variable when dropped.
 
 ## Install
@@ -38,7 +38,7 @@ assert!(!current_dir.ends_with("src"));
     let _tmp_env = tmp_env::set_var("TEST_TMP_ENV", "myvalue");
     assert_eq!(std::env::var("TEST_TMP_ENV"), Ok(String::from("myvalue")));
 }
-// Because guard `_tmp_env` is dropped then the environment variable is also automatically unset
+// Because guard `_tmp_env` is dropped then the environment variable is also automatically unset (not restored because no previous value was set)
 assert!(std::env::var("TEST_TMP_ENV").is_err());
 ```
 
